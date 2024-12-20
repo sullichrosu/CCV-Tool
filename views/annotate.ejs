@@ -1,0 +1,29 @@
+<%- include('includes/header') %>
+<%- include('includes/navbar', { activePage }) %>
+
+<div id="annotate">
+    <div class="container">
+        <div class="Annotate">
+            <h3>Annotate Project: <span style="color: black;"><%= PName %> </span></h3>
+            <h3>Classes:</h3>
+            <div class="col-md-12">
+                <table class="table table-striped">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">Class Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% classes.forEach(function(classItem) { %>
+                            <tr>
+                                <td>
+                                    <a href="/review?class=<%= encodeURIComponent(classItem.CName) %>&IDX=<%= IDX %>"><%= classItem.CName %></a>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

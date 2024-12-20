@@ -383,6 +383,43 @@ var canvas = new fabric.Canvas('canvas', {
 // set cursor when hover over canvas to cross
 canvas.hoverCursor = 'crosshair';
 
+// crosshair lines
+
+var verticalLine = new fabric.Line([0, 0, 0, canvas.height], {
+    stroke: 'red',
+    selectable: false,
+    evented: false
+});
+
+var horizontalLine = new fabric.Line([0, 0, canvas.width, 0], {
+    stroke: 'red',
+    selectable: false,
+    evented: false
+});
+
+canvas.add(verticalLine);
+canvas.add(horizontalLine);
+
+canvas.on('mouse:move', function (options) {
+    var pointer = canvas.getPointer(options.e);
+
+    verticalLine.set({ 
+        x1: pointer.x, 
+        x2: pointer.x, 
+        y1: 0,
+        y2: canvas.height
+    });
+
+    horizontalLine.set({
+        x1: 0,
+        x2: canvas.width,
+        y1: pointer.y,
+        y2: pointer.y
+    });
+    canvas.renderAll();
+
+});
+
 // get labels counter and list of labels
 var counter = parseInt($('#labels-counter').val()),
     list_labels = $('.labels');

@@ -1,4 +1,5 @@
 <%- include('includes/header') %>
+<%- include('includes/navbarV', { activePage }) %>
 <script>
 	if("<%= access.includes(user)%>" == "false")
 	{
@@ -6,19 +7,6 @@
 	}
 </script>
 <div id="project">
-	<div class="col-md-12">
-		<ul class="nav nav-tabs">
-			<li class="nav-item">
-				<a class="nav-link active" href="/projectV?IDX=<%= IDX %>" style="border-radius: 0;">Labels</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/configV?IDX=<%= IDX %>" style="border-radius: 0">Configuration</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/statsV?IDX=<%= IDX %>" style="border-radius: 0">Stats</a>
-			</li>
-		</ul>
-	</div>
 	<div class="col-md-12">
 		<h1 style="text-align: center;"><%= PName %></h1>
 	</div>

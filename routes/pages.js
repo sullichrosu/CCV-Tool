@@ -2,6 +2,8 @@
 // Main - Routes
 
 const { reject, filter } = require("bluebird");
+const { use, merge } = require("./api");
+const { act } = require("@react-three/fiber");
 
 ////////////////////////////////////////////////////////
 module.exports = {
@@ -16,6 +18,293 @@ module.exports = {
             logged: req.query.logged
         });
 	},
+
+	getProjectSettingsPage: async (req, res) => {
+		var user = req.cookies.Username;
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '"+user+"'");
+		var IDX = req.query.IDX;
+
+		if(IDX == undefined)
+		{
+			IDX = 0;
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		if(user == undefined)
+		{
+			return res.redirect('/');
+		}
+
+		if(IDX >= projects.length){
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		var PName = projects[IDX].PName;
+		var admin = projects[IDX].Admin;
+
+		var results1 = await db.getAsync("SELECT * FROM `Projects` WHERE PName = '" + PName + "' AND Admin = '" + admin + "'");
+
+
+		console.log("username: ", user);
+		console.log("getProjectSettingsPage");
+
+		try{
+			res.render('settings/projSettings', {
+				title: 'projSettings',
+				logged: req.query.logged,
+				user: user,
+				PName: PName,
+				Admin: admin,
+				PDescription: results1.PDescription,
+				IDX: IDX,
+				activePage: 'projSettings'
+			});
+		} catch (error) {
+			console.error('Error rendering projSettings:', error);
+			res.status(500).send('Error loading page');
+		}
+	},
+
+	getClassSettingsPage: async (req, res) => {
+		var IDX = req.query.IDX;
+		if(IDX == undefined)
+		{
+			IDX = 0;
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		var user = req.cookies.Username;
+		if(user == undefined)
+		{
+			return res.redirect('/');
+		}
+
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '"+user+"'");
+		if(IDX >= projects.length){
+			valid = 1;
+			return res.redirect('/home');
+		}
+		
+		var PName = projects[IDX].PName;
+		var admin = projects[IDX].Admin;
+
+		var public_path = __dirname.replace('routes',''),
+			main_path = public_path + 'public/projects/',
+			project_path = main_path + admin + '-' + PName,
+			path = project_path + '/' + PName + '.db';
+
+		var cfdb = new sqlite3.Database(path, (err) => {
+			if (err) {
+				return console.error(err.message);
+			}
+			console.log('Connected to cfdb.');
+		});
+
+		cfdb.allAsync = function (sql) {
+			var that = this;
+			return new Promise(function (resolve, reject) {
+				that.all(sql, function (err, row) {
+					if (err)
+					{
+						console.log("runAsync ERROR! ", err);
+						reject(err);
+					}
+					else
+						resolve(row);
+				});
+			}).catch(err => {
+				console.log(err)
+			});
+		};		
+		
+		var results2 = await cfdb.allAsync("SELECT * FROM `Classes`");
+
+		cfdb.close(function(err){
+			if(err)
+			{
+				console.error(err);
+			}
+			else{
+				console.log("cfdb closed successfully");
+			}
+		});
+
+		var colors = [];
+		var i = 0;
+		while(colors.length < results2.length)
+		{
+			if(i >= colorsJSON.length)
+			{
+				i = 0;
+			}
+			colors.push(colorsJSON[i]);
+			i++;
+		}
+
+		try{
+			res.render('settings/classSettings', {
+				title: 'classSettings',
+				logged: req.query.logged,
+				user: user,
+				PName: PName,
+				Admin: admin,
+				IDX: IDX,
+				classes: results2,
+				colors: colors,
+				activePage: 'classSettings'
+
+			});
+		}
+		catch (error) {
+			console.error('Error rendering classSettings:', error);
+			res.status(500).send('Error loading page');
+		}
+	},
+
+	getAccessSettingsPage: async (req, res) => {
+
+		var user = req.cookies.Username;
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '"+user+"'");
+		var IDX = req.query.IDX;
+
+		if(IDX == undefined)
+		{
+			IDX = 0;
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		if(user == undefined)
+		{
+			return res.redirect('/');
+		}
+
+		if(IDX >= projects.length){
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		var PName = projects[IDX].PName;
+		var admin = projects[IDX].Admin;
+
+		var results3 = await db.allAsync("SELECT * FROM `Access` WHERE PName= '" + PName + "' AND Admin = '"+ admin + "' AND Username != '"+user+"'");
+
+		var access = [];
+        for(var i = 0; i < results3.length; i++)
+        {
+            access.push(results3[i].Username);
+        }
+
+		try{
+			res.render('settings/accessSettings', {
+				title: 'accessSettings',
+				logged: req.query.logged,
+				user: user,
+				IDX: IDX,
+				access: access,
+				Admin: admin,
+				PName: PName,
+				activePage: 'accessSettings'
+			});
+		}
+		catch (error) {
+			console.error('Error rendering accessSettings:', error);
+			res.status(500).send('Error loading page');
+		}
+	},
+
+	getImageSettingsPage: async (req, res) => {
+		var user = req.cookies.Username;
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '"+user+"'");
+		var IDX = req.query.IDX;
+
+		if(IDX == undefined)
+		{
+			IDX = 0;
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		if(user == undefined)
+		{
+			return res.redirect('/');
+		}
+
+		if(IDX >= projects.length){
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		var PName = projects[IDX].PName;
+		var admin = projects[IDX].Admin;
+
+		try{
+			res.render('settings/imagesSettings', {
+				title: 'imageSettings',
+				logged: req.query.logged,
+				user: user,
+				PName: PName,
+				Admin: admin,
+				IDX: IDX,
+				activePage: 'imageSettings'
+			});
+		}
+		catch (error) {
+			console.error('Error rendering imageSettings:', error);
+			res.status(500).send('Error loading page');
+		}
+	},
+
+	getMergeSettingsPage: async (req, res) => {
+
+		var user = req.cookies.Username;
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '"+user+"'");
+		var IDX = req.query.IDX;
+
+		if(IDX == undefined)
+		{
+			IDX = 0;
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		if(user == undefined)
+		{
+			return res.redirect('/');
+		}
+
+		if(IDX >= projects.length){
+			valid = 1;
+			return res.redirect('/home');
+		}
+
+		var PName = projects[IDX].PName;
+		var admin = projects[IDX].Admin;
+		var mergeProjects = await db.allAsync("SELECT * FROM Access WHERE Username = '"+user+"' AND NOT PName = '"+PName+"'");
+
+		console.log("username: ", user);
+		console.log("getMergeSettingsPage");
+
+		try{
+			res.render('settings/mergeSettings', {
+				title: 'mergeSettings',
+				logged: req.query.logged,
+				user: user,
+				PName: PName,
+				Admin: admin,
+				IDX: IDX,
+				activePage: 'mergeSettings',
+				mergeProjects: mergeProjects
+			});
+		} catch (error) {
+			console.error('Error rendering projSettings:', error);
+			res.status(500).send('Error loading page');
+		}
+	},
+
 
     // Signup page
     getSignupPage: async (req,res) => {
@@ -340,6 +629,188 @@ module.exports = {
         });
     },
 
+	getAnnotatePage: async (req, res) => {
+		var username = req.cookies.Username;
+		console.log('Received IDX:', req.query.IDX);
+		var IDX = parseInt(req.query.IDX, 10);
+		
+		console.log('Parsed IDX:', IDX);
+		
+		if (isNaN(IDX)) {
+			console.error('Invalid IDX:', IDX);
+			return res.redirect('/home');
+		}
+	
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '" + username + "'");
+		var project = projects[IDX];
+	
+		if (!project) {
+			console.error('No project found for IDX:', IDX);
+			return res.redirect('/home');
+		}
+	
+		var PName = project.PName;
+		var admin = project.Admin;
+	
+		// Construct the database path
+		var public_path = __dirname.replace('routes', '');
+		var db_path = public_path + 'public/projects/' + admin + '-' + PName + '/' + PName + '.db';
+	
+		// Log the database path being accessed
+		console.log('Accessing database file:', db_path);
+	
+		// If you need to connect to this specific database
+		var pdb = new sqlite3.Database(db_path, (err) => {
+			if (err) {
+				return console.error('Database connection error:', err.message);
+			}
+			console.log('Connected to pdb.');
+		});
+
+		pdb.allAsync = function (sql) {
+			var that = this;
+			return new Promise(function (resolve, reject) {
+				that.all(sql, function (err, row) {
+					if (err)
+					{
+						console.log("runAsync ERROR! ", err);
+						reject(err);
+					}
+					else
+						resolve(row);
+				});
+			}).catch(err => {
+				console.log(err)
+			});
+		};	
+
+		var Classes = await pdb.allAsync("SELECT * FROM `Classes`");
+
+		console.log('Classes:', Classes);
+			
+		res.render('annotate', {
+			title: 'annotate',
+			user: username,
+			logged: req.query.logged,
+			db: req.query.db,
+			PName: PName,
+			classes: Classes,
+			IDX: IDX,
+			activePage: 'Annotate' 
+
+		});
+	},
+
+	getReviewPage: async (req, res) => {
+
+		console.log('---------------------------------getReviewPage---------------------------------');
+
+		var username = req.cookies.Username;
+		var CName = req.query.class;
+		var IDX = req.query.IDX;
+
+		var page = parseInt(req.query.page) || 1;
+		var pageSize = 100;
+		var offset = (page - 1) * pageSize;
+		
+	
+		var projects = await db.allAsync("SELECT * FROM Access WHERE Username = '" + username + "'");
+		var project = projects[IDX];
+	
+		if (!project) {
+			console.error('No project found for IDX:', IDX);
+			return res.redirect('/home');
+		}
+	
+		var PName = project.PName;
+		var admin = project.Admin;
+	
+		var public_path = __dirname.replace('routes', '');
+		var db_path = public_path + 'public/projects/' + admin + '-' + PName + '/' + PName + '.db';
+	
+		var pdb = new sqlite3.Database(db_path, (err) => {
+			if (err) {
+				return console.error('Database connection error:', err.message);
+			}
+			console.log('Connected to pdb.');
+		});
+	
+		pdb.allAsync = function (sql, params) {
+			var that = this;
+			return new Promise(function (resolve, reject) {
+				that.all(sql, params, function (err, row) {
+					if (err) {
+						console.log("runAsync ERROR! ", err);
+						reject(err);
+					} else {
+						resolve(row);
+					}
+				});
+			}).catch(err => {
+				console.log(err);
+			});
+		};
+
+		var totalImages = await pdb.allAsync(`
+			SELECT COUNT(*) as count 
+			FROM Images
+			INNER JOIN Labels ON Images.IName = Labels.IName
+			WHERE Labels.CName = ?
+		`, [CName]);
+
+		var images = await pdb.allAsync(`
+			SELECT Images.IName
+			FROM Images
+			INNER JOIN Labels ON Images.IName = Labels.IName
+			WHERE Labels.CName = ?
+			LIMIT ? OFFSET ?
+		`, [CName, pageSize, offset]);
+
+		let uniqueImages = images.filter((image, index, self) =>
+			index === self.findIndex((img) => img.IName === image.IName)
+		);
+	
+		var imageLabels = {};
+		for (let i = 0; i < uniqueImages.length; i++) {
+
+			let imageName = uniqueImages[i].IName;
+	
+			let labels = await pdb.allAsync(`
+				SELECT * FROM Labels WHERE IName = ?
+			`, [imageName]);
+	
+			imageLabels[imageName] = labels;
+		}
+
+		var classes = await pdb.allAsync("SELECT * FROM `Classes`");
+
+		console.log('images:', uniqueImages);
+		console.log('imageLabels:', imageLabels);
+
+
+		pdb.close((err) => {
+			if (err) {
+				console.error('Error closing database connection:', err.message);
+			}
+			console.log('Closed pdb connection.');
+		});
+
+		let totalImagesCount = Math.ceil(totalImages[0].count / pageSize);
+	
+		res.render('review', {
+			user: username,
+			CName: CName,
+			images: uniqueImages,
+			imageLabels: imageLabels,
+			PName: PName, // Added PName to the render call
+			classes: classes,
+			currentPage: page,
+			totalPageCount: totalImagesCount,
+			selectedClass: req.query.class,
+			IDX: IDX,
+			activePage: 'Annotate'
+		});
+	},
     // project page
     getProjectPage: async (req, res) => {
         console.log("getProjectPage");
@@ -461,7 +932,8 @@ module.exports = {
             current: page,
             pages: Math.ceil(results2['COUNT(*)']/perPage),
             perPage: perPage,
-            logged: req.query.logged
+            logged: req.query.logged,
+			activePage: 'project'
         });
     },
 
@@ -742,7 +1214,8 @@ module.exports = {
 			sortFilter: sortFilter,
 			imageClass: imageClass,
 			projectClasses: Classes,
-			imageConf: imageConf
+			imageConf: imageConf,
+			activePage: 'ProjectV'
         });
     },
 
@@ -909,8 +1382,13 @@ module.exports = {
 
 		var colors = [];
 		var i = 0;
+
+		console.log(colors);
+		console.log("this is colors", colorsJSON);
+
 		while(colors.length < results2.length)
 		{
+			
 			if(i >= colorsJSON.length)
 			{
 				i = 0;
@@ -948,7 +1426,8 @@ module.exports = {
 			classes: results2,
 			colors: colors,
             logged: req.query.logged,
-			mergeProjects: mergeProjects
+			mergeProjects: mergeProjects,
+			activePage: 'Configuration'
         });
     },
 
@@ -1152,7 +1631,8 @@ getValidationConfigPage: async (req, res) => {
 		classes: results2,
 		colors: colors,
 		logged: req.query.logged,
-		mergeProjects: mergeProjects
+		mergeProjects: mergeProjects,
+		activePage: 'ConfigurationV'
 	});
 },
 
@@ -1320,7 +1800,9 @@ getValidationConfigPage: async (req, res) => {
 			scripts: scripts,
 			weights: weights,
 			has_scripts: has_scripts,
-            logged: req.query.logged
+            logged: req.query.logged,
+			activePage: 'Download'
+
         });
 	},
 	
@@ -1833,6 +2315,7 @@ getValidationConfigPage: async (req, res) => {
         
 		var colors = [];
 		var i = 0;
+
 		while(colors.length < Classes.length)
 		{
 			if(i >= colorsJSON.length)
@@ -1900,7 +2383,7 @@ getValidationConfigPage: async (req, res) => {
     getTrainingPage: async (req, res) => {
         console.log("getTrainingPage");
 	   
-		const readdir = util.promisify(glob)
+		const readdir = util.promisify(fs.readdir)
 		const readFile = util.promisify(fs.readFile)
 		
 		// get URL variables
@@ -2166,7 +2649,8 @@ getValidationConfigPage: async (req, res) => {
 			run_status: run_status,
 			run_paths: run_paths,
 			log_contents: log_contents,
-            logged: req.query.logged
+            logged: req.query.logged,
+			activePage: 'Training'
         });
     },
 
@@ -2174,7 +2658,7 @@ getValidationConfigPage: async (req, res) => {
     getYoloPage: async (req, res) => {
         console.log("getYoloPage");
 	   
-		const readdir = util.promisify(glob)
+		const readdir = util.promisify(fs.readdir)
 		const readFile = util.promisify(fs.readFile)
 		
 		// get URL variables
@@ -2456,7 +2940,8 @@ getValidationConfigPage: async (req, res) => {
 			run_status: run_status,
 			run_paths: run_paths,
 			log_contents: log_contents,
-            logged: req.query.logged
+            logged: req.query.logged,
+			activePage: 'Yolo'
         });
     },
 
@@ -2587,7 +3072,8 @@ getValidationConfigPage: async (req, res) => {
 			counts: counts,
 			icounts: icounts,
 			complete: complete,
-            logged: req.query.logged
+            logged: req.query.logged,
+			activePage: 'Stats'
         });
     },
 
@@ -2718,7 +3204,8 @@ getValidationConfigPage: async (req, res) => {
 			counts: counts,
 			icounts: icounts,
 			complete: complete,
-            logged: req.query.logged
+            logged: req.query.logged,
+			activePage: 'StatsV'
         });
     },
 

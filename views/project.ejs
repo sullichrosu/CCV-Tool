@@ -1,4 +1,5 @@
 <%- include('includes/header') %>
+<%- include('includes/navbar', { activePage }) %>
 <script>
 	if("<%= access.includes(user)%>" == "false")
 	{
@@ -6,28 +7,6 @@
 	}
 </script>
 <div id="project">
-	<div class="col-md-12">
-		<ul class="nav nav-tabs">
-			<li class="nav-item">
-				<a class="nav-link active" href="/project?IDX=<%= IDX %>" style="border-radius: 0;">Labels</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/config?IDX=<%= IDX %>" style="border-radius: 0">Configuration</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/download?IDX=<%= IDX %>" style="border-radius: 0">Download</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/stats?IDX=<%= IDX %>" style="border-radius: 0">Stats</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/training?IDX=<%= IDX %>" style="border-radius: 0">Tensorflow</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" href="/yolo?IDX=<%= IDX %>" style="border-radius: 0">Yolo</a>
-			</li>
-		</ul>
-	</div>
 	<div class="col-md-12">
 		<h1 style="text-align: center;"><%= PName %></h1>
 	</div>
@@ -37,6 +16,7 @@
 
 		<label for="perpage">PerPage:</label>
 		<input type="number" id="perpage" name="perpage" min="1" value="<%=perPage%>" style="width: 25%;">
+		
 		
 	</div>
 	<div class="col-md-12">
@@ -118,6 +98,16 @@
 		<% } %>
 	</div>
 </div>
+
+
+
+
+<script>
+    function annotatePage(IDX){
+        window.location.href = `/annotate?IDX=${IDX}`;
+    }
+</script>
+
 
 <script>
 	var pgnum = document.getElementById("page");

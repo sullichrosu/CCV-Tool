@@ -9,13 +9,132 @@ const { protocol } = require('socket.io-client');
 const { OPEN_CREATE } = require('sqlite3');
 const rimraf = require('../public/libraries/rimraf');
 const ffmpeg = require('ffmpeg');
-
+const { folder } = require('decompress-zip/lib/extractors');
+const { exec } = require('child_process');
+const path = require('path');
+const { stdout } = require('process');
+const sharp = require('sharp');
 const api = express.Router();
+
+
+// api.get('/config', (req, res) => {
+// 	const idx = req.query.IDX;
+// 	res.render('config', { IDX: idx });
+
+// });
+
 
 api.post('/logout', async (req, res) => {
 	res.clearCookie("Username");
 	res.redirect("/");
 });
+
+api.post('/switch-class', (req, res) => {
+	console.log("Switch post request");
+    var username = req.body.username;
+    var switchClass = req.body.class;
+	var PName = req.body.PName;
+	var labelID = req.body.LabelID;
+
+    console.log("this is username:", username);
+    console.log("Received switchClasses:", switchClass);
+	console.log("Received PNname:", PName);
+	console.log("labelID:", labelID);
+
+    var public_path = __dirname.replace('routes','');
+    var main_path = public_path + 'public/projects/';
+	var db_path = main_path + username + '-' + PName + '/' + PName + '.db';
+
+	console.log(db_path);
+
+	var pdb = new sqlite3.Database(db_path, (err) => {
+		if(err){
+			return console.log('Database connection error:', err.message);
+		}
+		console.log('connected to pdb.');
+	});
+
+	const updateClassQuery = `UPDATE Labels 
+							SET CName = ? 
+							WHERE LID = ?`;
+
+	pdb.run(updateClassQuery, [switchClass, labelID], function (err) {
+		if (err) {
+			console.error("Error updating class:", err.message);
+			res.status(500).json({ error: "Failed to switch class" });
+		} else {
+			console.log(`Row(s) updated: ${this.changes}`);
+			res.json({ success: true, message: "Class switched successfully for the specific label" });
+		}
+	});
+
+	pdb.close((err) => {
+        if (err) {
+            console.error('Error closing the database connection:', err.message);
+        }
+        console.log('Database connectioooon closed.');
+    });
+
+});
+
+
+api.post('/submit-review', (req, res) => {
+
+	console.log("Submit review post request");
+	var username = req.body.username;
+	var PName = req.body.PName;
+	var badlabels = req.body.badlabels;
+
+	var public_path = __dirname.replace('routes','');
+    var main_path = public_path + 'public/projects/';
+	var db_path = main_path + username + '-' + PName + '/' + PName + '.db';
+
+	console.log(db_path);
+	console.log("badlabels:", badlabels);
+
+	var pdb = new sqlite3.Database(db_path, (err) => {
+		if(err){
+			return console.log('Database connection error:', err.message);
+		}
+		console.log('connected to pdb.');
+	});
+
+	let completedQueries = 0;
+    let errors = [];
+
+	badlabels.forEach((badlabelID) => {
+
+		const deleteLabelsQuery = 'DELETE FROM Labels WHERE LID = ?';
+
+		pdb.run(deleteLabelsQuery,[badlabelID], function(err) {
+			if(err){
+				console.error("Error deleting label:", err.message);
+                errors.push({ label: badlabelID, error: err.message });
+			} else {
+				console.log(`Row(s) deleted for label ${badlabelID}: ${this.changes}`);
+			}
+
+			completedQueries++;
+
+			if(completedQueries === badlabels.length){
+				pdb.close((err) => {
+					if (err) {
+                        console.error('Error closing the database connection:', err.message);
+                        return res.status(500).json({ error: 'Error closing the database connection' });
+                    }
+					console.log('Database connection closed.');
+					if (errors.length > 0) {
+                        res.status(500).json({ success: false, errors });
+                    } else {
+                        res.json({ success: true, message: "Successfully deleted bad labels" });
+                    }
+				});
+			}
+		});
+	});
+});
+
+
 
 
 api.post('/login', async (req, res) => {
@@ -969,6 +1088,8 @@ api.post('/updateLabels', async (req, res) => {
 api.post('/updateProject', async (req, res) => {
 	console.log("updateProject");
 
+	console.log(req.body);
+
 	// get url
 	var PName = req.body.PName,
 		admin = req.body.Admin,
@@ -988,7 +1109,7 @@ api.post('/updateProject', async (req, res) => {
 		"', AutoSave = '"+auto_save+
 		"' WHERE PName = '" + PName + "' AND Admin = '" + admin + "'");
 	
-	return res.redirect('/config?IDX='+IDX);
+	return res.redirect('/config/projSettings?IDX='+IDX);
 });
 
 
@@ -1193,7 +1314,7 @@ api.post('/addClasses', async (req, res) => {
 	});
 
 	if (validation) return res.redirect('/configV?IDX='+IDX);
-	return res.redirect('/config?IDX='+IDX);
+	return res.redirect('/config/classSettings?IDX='+IDX);
 });
 
 
@@ -1548,9 +1669,171 @@ api.post('/downloadDataset', async (req, res) => {
 	var cnames = [];
 	var results1 = await dddb.allAsync("SELECT * FROM Classes");
 	var results2 = await dddb.allAsync("SELECT * FROM Images");
+
 	for(var i = 0; i < results1.length; i++)
 	{
 		cnames.push(results1[i].CName);
+	}
+
+	//classfication
+	if(download_format == 6){
+
+		const cropImage = async(sourcePath, targetPath, x, y, width, height) => {
+			try{
+				const cropOptions = {
+					left: Math.floor(x),    // Ensure x is an integer
+					top: Math.floor(y),     // Ensure y is an integer
+					width: Math.floor(width), // Ensure width is an integer
+					height: Math.floor(height), // Ensure height is an integer
+				};
+				await sharp(sourcePath)
+				.extract(cropOptions) // Crop with x, y, w, h
+				.toFile(targetPath); // Save to the target path
+
+				console.log(`Image cropped successfully: ${targetPath}`)
+				
+			} catch (err) {
+				console.error(`error cropping image: ${err.message}`)
+			}
+
+		};
+
+		console.log("HELLOOO")
+
+		folderName = downloads_path + '/dataset';
+		folderTrain = folderName + '/train';
+		folderVal = folderName + '/val';
+
+		try {
+			if (!fs.existsSync(folderName)) {
+				fs.mkdirSync(folderName);
+			}
+			if (!fs.existsSync(folderTrain)) {
+				fs.mkdirSync(folderTrain);
+			}
+			if (!fs.existsSync(folderVal)) {
+				fs.mkdirSync(folderVal);
+			}
+			console.log("Directories created");
+		} catch (err) {
+			console.error(err);
+		}
+		
+		// Get all the image class mappings
+		
+		var imageClassMapping = await dddb.allAsync(`
+			SELECT Labels.CName, Labels.X, Labels.Y, Labels.W, Labels.H, Images.IName, Images.reviewImage, Images.validateImage
+			FROM Labels
+			JOIN Images ON Labels.IName = Images.IName
+		`);
+
+		const processedImages = {};
+		const croppingPromises = [];
+
+		imageClassMapping.forEach((indivdualClass) => {
+			console.log(indivdualClass.CName)
+			classFolderTrain = folderTrain + '/' + indivdualClass.CName
+			classFolderVal = folderVal + '/' + indivdualClass.CName
+
+			try {
+				if (!fs.existsSync(classFolderTrain)) {
+				  fs.mkdirSync(classFolderTrain);
+				}
+			} catch (err) {
+				console.error(err);
+			}
+			try {
+				if (!fs.existsSync(classFolderVal)) {
+				  fs.mkdirSync(classFolderVal);
+				}
+			} catch (err) {
+				console.error(err);
+			}
+
+			// math random to split into validation and training
+
+			const isValidation = Math.random() < 0.2;
+			let targetFolder = isValidation ? classFolderVal : classFolderTrain;
+			let sourceImagePath = images_path + '/' + indivdualClass.IName
+
+			if (!processedImages[indivdualClass.IName]) {
+				processedImages[indivdualClass.IName] = 0;
+			  }
+			processedImages[indivdualClass.IName]++;
+
+			let targetImagePath = targetFolder + '/' + path.parse(indivdualClass.IName).name + '_crop' + processedImages[indivdualClass.IName] + path.extname(indivdualClass.IName);
+
+			const x = indivdualClass.X;
+			const y = indivdualClass.Y;
+			const w = indivdualClass.W;
+			const h = indivdualClass.H;
+			
+			croppingPromises.push(cropImage(sourceImagePath, targetImagePath, indivdualClass.X, indivdualClass.Y, indivdualClass.W, indivdualClass.H));
+
+
+		});
+
+		await Promise.all(croppingPromises);	
+
+		const folderZip = downloads_path + '/dataset.zip';
+		const output = fs.createWriteStream(folderZip);
+
+		const archive = archiver('zip', {
+			zlib: { level: 9 }
+		});
+
+		output.on('close', () => {
+			console.log(`${archive.pointer()} total bytes`);
+			console.log('archiver has been finalized and the output file descriptor has closed.');
+			dddb.close((err) => {
+				if(err){
+					console.error(err);
+				} else {
+					console.log('dddb closed successfully');
+				}
+			});
+			res.download(folderZip, (err) => {
+				if (err) {
+					console.error('Error downloading the file:', err);
+				} else {
+					console.log('File downloaded successfully');
+		
+					// Delete the zip file
+					fs.unlink(folderZip, (err) => {
+						if (err) {
+							console.error('Error deleting the zip file:', err);
+						} else {
+							console.log('Zip file deleted successfully');
+						}
+					});
+		
+					// Delete the folder
+					fs.rm(folderName, { recursive: true }, (err) => {
+						if (err) {
+							console.error('Error deleting the folder:', err);
+						} else {
+							console.log('Folder deleted successfully');
+						}
+					});
+				}
+			});
+		});
+
+		archive.on('warning', (err) => {
+			if (err.code === 'ENOENT') {
+				console.warn(err);
+			} else {
+				throw err;
+			}
+		});
+
+		archive.on('error', (err) => {
+			throw err;
+		});
+
+		archive.pipe(output);
+		archive.directory(folderName, false);
+		archive.finalize();		
 	}
 
 	// Yolo Format
@@ -2596,9 +2879,9 @@ api.post('/import', async(req,res) => {
 api.post('/mergeTest', async(req,res) => {
 	console.log("\nmergeTest");
 
-	const {exec} = require('child_process')
-	const rmdir = util.promisify(fs.rmdir)
-	const readdir = util.promisify(glob)
+	// const {exec} = require('child_process')
+	// const rmdir = util.promisify(fs.rmdir)
+	// const readdir = util.promisify(glob)
 	//get form variables
 	var upload_images = req.files.upload_project,
 		project_name = req.body.PName,
@@ -3144,7 +3427,7 @@ api.post('/mergeTest', async(req,res) => {
 				// get incoming labels
 				var results6 = await nmdb.allAsync("SELECT * FROM Labels");
 
-				var results7 = await mergeDB.allAsync("SELECT * FROM Validation");
+				var results7 = await nmdb.allAsync("SELECT * FROM Validation");
 				var new_valids = [];
 				for(var i = 0; i < results7.length; i++)
 				{
@@ -3721,7 +4004,7 @@ api.post('/addUser', async(req,res) => {
 		}
 	}
 	if(validation) return res.redirect('/configV?IDX='+IDX);
-	return res.redirect('/config?IDX='+IDX);
+	return res.redirect('/config/accessSettings?IDX='+IDX);
 });
 
 
@@ -3740,7 +4023,7 @@ api.post('/removeAccess', async(req,res) => {
 	await db.runAsync("DELETE FROM Access WHERE PName = '" + PName + "' AND Username = '" + OldUser + "' AND Admin = '" + Admin + "'");
 
 	if(validation) return res.redirect('/configV?IDX='+IDX);
-	return res.redirect('/config?IDX='+IDX);
+	return res.redirect('/config/accessSettings?IDX='+IDX);
 });
 
 
@@ -4952,18 +5235,67 @@ api.post('/deleteUser', async (req,res) =>{
 
 });
 
+api.post('/updateClass', async (req, res) => {
+    console.log("Request body:", req.body);
+	
+	const className = req.body.currentClassName
+ 	const updateClassName = req.body.updatedValue;
+	//update Class name
+
+	var IDX = parseInt(req.body.IDX),
+	PName = req.body.PName,
+	admin = req.body.Admin,
+	user = req.cookies.Username
+	
+	var public_path = __dirname.replace('routes',''),
+	main_path = public_path + 'public/projects/',
+	project_path = main_path + user + '-' + PName;
+
+	// console.log("project_path: ", project_path);
+	// console.log("Current Class Name:", className);
+    // console.log("Updated Class Name:", updateClassName);
+
+	var db = new sqlite3.Database(project_path+'/'+PName+'.db', (err) => {
+		if (err) {
+			return console.error(err.message);
+		}
+		console.log('Connected to db.');
+	});
+
+	const sql = `UPDATE Classes SET CName = ? WHERE CName = ?`;
+    db.run(sql, [updateClassName, className], function (err) {
+        if (err) {
+            console.error("Error running SQL query:", err.message);
+            return res.status(500).send("SQL query error");
+        }
+		
+        console.log(`Row(s) updated: ${this.changes}`);
+        console.log(`Last Query: ${sql}`);
+        console.log(`Parameters: [${updateClassName}, ${className}]`);
+        res.status(200).send(`Row(s) updated: ${this.changes}`);
+    });
+
+    db.close((err) => {
+        if (err) {
+            console.error("Error closing database:", err.message);
+        } else {
+            console.log("db closed successfully");
+        }
+    });
+});
+
 
 
 api.post('/deleteClass', async (req, res) => {
-	console.log("deleteClass");
+	console.log("body", req.body);
 	   	
 	var IDX = parseInt(req.body.IDX),
 		PName = req.body.PName,
 		admin = req.body.Admin,
 		user = req.cookies.Username,
-		classes = req.body.classArray;
+		classes = req.body['classArray[]'];
 
-		console.log("IDX: ", IDX)
+		console.log("classes: ", classes);
 	// set paths
 	var public_path = __dirname.replace('routes',''),
 		main_path = public_path + 'public/projects/',

@@ -147,6 +147,9 @@ a:hover {
     cursor: not-allowed;
     width: 100vw;
 }
+
+
+
 .upper-canvas {
     cursor: crosshair !important;
     margin: auto;
@@ -279,6 +282,7 @@ a:hover {
     color:rgb(255, 255, 255);
     font-weight: bold;
 }
+
 
 .imageLabels {
     display: flex;

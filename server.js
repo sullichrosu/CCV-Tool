@@ -159,6 +159,8 @@ const {
     getHomePage,
     getCreatePage,
     getProjectPage,
+    getAnnotatePage,
+    getReviewPage,
 	getConfigPage,
 	getDownloadPage,
 	getLabelingPage,
@@ -166,6 +168,11 @@ const {
     getTrainingPage,
 	getYoloPage,
 	getUserPage,
+    getProjectSettingsPage,
+    getClassSettingsPage,
+    getAccessSettingsPage,
+    getImageSettingsPage,
+    getMergeSettingsPage,
   get404Page,
   getValidationHomePage,
   getValidationProjectPage,
@@ -196,12 +203,20 @@ app.use("/",api);
 ////////////////////////////////////////////////////////
 
 // get
+
 app.get('/', getLoginPage);
 app.get('/signup', getSignupPage);
 app.get('/home', getHomePage);
 app.get('/create', getCreatePage);
+app.get('/annotate', getAnnotatePage);
+app.get('/review', getReviewPage);
 app.get('/project', getProjectPage);
 app.get('/config', getConfigPage);
+app.get('/config/projSettings', getProjectSettingsPage);
+app.get('/config/classSettings', getClassSettingsPage);
+app.get('/config/accessSettings', getAccessSettingsPage);
+app.get('/config/imageSettings', getImageSettingsPage);
+app.get('/config/mergeSettings', getMergeSettingsPage);
 app.get('/download', getDownloadPage);
 app.get('/labeling', getLabelingPage);
 app.get('/stats', getStatsPage);
